@@ -1,53 +1,74 @@
-// sw.js
-
-// 1. Definimos un nombre y versión para nuestro caché.
-const CACHE_NAME = 'pwa3-cache-v1';
-
-// 2. Listamos los archivos que queremos guardar en el caché (el "App Shell").
-const assetsToCache = [
-  'index.html',
-  'hola.png',
-  'lib1.js',
-  'lib2.js',
-  'unicorn.jpg', // Aunque no se use en index.html, lo agregamos si es necesario
-  'utp.png',
-  'manifiest.json'
+const CACHE_NAME = 'pwa3-v2';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/css/styles.css',
+  '/js/app.js',
+  '/js/chart.js',
+  '/manifest.json',
+  '/images/unicorn.png',
+  '/icons/homescreen192.png',
+  '/icons/icon-512x512.png'
 ];
 
-// 3. Evento de instalación: Se dispara cuando el Service Worker se instala.
-// Aquí es donde guardamos nuestros archivos en el caché.
-self.addEventListener('install', event => {
-  console.log('Instalando el Service Worker y guardando archivos en caché...');
-  // event.waitUntil() asegura que el SW no se instale hasta que el código dentro se complete.
+self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Caché abierto exitosamente');
-        // cache.addAll() toma una lista de URLs y las guarda en el caché.
-        return cache.addAll(assetsToCache);
+      .then((cache) => {
+        console.log('Opened cache');
+        return cache.addAll(urlsToCache);
       })
-      .catch(err => {
-        console.log('Falló el registro en caché: ', err);
+      .catch((error) => {
+        console.log('Cache addAll failed:', error);
       })
   );
 });
 
-// 4. Evento de fetch: Se dispara cada vez que la página solicita un recurso (una imagen, un script, etc.).
-// Aquí decidimos si entregamos el recurso desde el caché o desde la red.
-self.addEventListener('fetch', event => {
-  // event.respondWith() intercepta la petición.
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    // caches.match() busca si la petición ya existe en nuestro caché.
     caches.match(event.request)
-      .then(response => {
-        // Si encontramos una respuesta en el caché, la devolvemos.
+      .then((response) => {
         if (response) {
-          console.log('Entregando desde caché:', event.request.url);
           return response;
         }
-        // Si no está en caché, vamos a la red a buscarlo.
-        console.log('Entregando desde la red:', event.request.url);
-        return fetch(event.request);
+
+        return fetch(event.request)
+          .then((response) => {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            const responseToCache = response.clone();
+
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          });
       })
+      .catch(() => {
+        if (event.request.destination === 'document') {
+          return caches.match('/index.html');
+        }
+      })
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
   );
 });
