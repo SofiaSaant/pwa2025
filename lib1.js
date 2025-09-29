@@ -20,7 +20,7 @@ class Quickchart {
 
   generarSrcImg() {
     let url = "https://quickchart.io/chart?cht=p3&chd=t:" + this.crearCadunos() 
-              + "&chs=500x250&chl=" + "1/" + this.d;
+              + "&chs=300x150&chl=" + "1/" + this.d;
     return url;
   }
 }
